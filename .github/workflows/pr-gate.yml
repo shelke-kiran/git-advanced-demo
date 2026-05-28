@@ -1,0 +1,45 @@
+name: Pull Request Gatekeeper
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+    branches: [ main ]
+
+jobs:
+  gatekeeper:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Validate PR Title (Conventional Commits)
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          echo "Analyzing PR Title: '$PR_TITLE'"
+          
+          # Conventional Commits regex
+          CONVENTIONAL_REGEX="^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([a-z0-9\-]+\))?: .+"
+          
+          if [[ ! "$PR_TITLE" =~ $CONVENTIONAL_REGEX ]]; then
+            echo "::error::PR Title '$PR_TITLE' does not match Conventional Commits rules!"
+            echo "Examples of valid titles:"
+            echo "  - feat: add database caching layer"
+            echo "  - fix(auth): resolve session expiration timeout"
+            echo "  - docs: update setup guides"
+            exit 1
+          fi
+          echo "PR Title successfully validated!"
+
+      - name: Generate PR Quality Report
+        if: always()
+        run: |
+          echo "### 🚀 Pull Request Gatekeeper Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "#### ✅ Status: ALL GATES PASSED" >> $GITHUB_STEP_SUMMARY
+            echo "The conventional commit validation has successfully finished. This PR is ready for manual review!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "#### ❌ Status: GATE KEEPER FAILED" >> $GITHUB_STEP_SUMMARY
+            echo "Please inspect the error logs above. Ensure your PR title starts with a valid prefix (e.g., \`feat:\`, \`fix:\`, \`chore:\`) followed by a description." >> $GITHUB_STEP_SUMMARY
+          fi
